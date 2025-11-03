@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Portal - ZeroMonos</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { color: #667eea; margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 30px; }
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        select {
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .bookings-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .bookings-table th {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .bookings-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .bookings-table tr:hover {
+            background: #f8f9fa;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-RECEIVED { background: #cfe2ff; color: #084298; }
+        .status-ASSIGNED { background: #fff3cd; color: #997404; }
+        .status-IN_PROGRESS { background: #d1e7dd; color: #0f5132; }
+        .status-COMPLETED { background: #d1e7dd; color: #0a3622; }
+        .status-CANCELED { background: #f8d7da; color: #842029; }
+        .action-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 2px;
+            font-weight: 600;
+        }
+        .btn-assign { background: #ffc107; color: #000; }
+        .btn-progress { background: #17a2b8; color: white; }
+        .btn-complete { background: #28a745; color: white; }
+        .no-bookings {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .links {
+            margin-top: 30px;
+            text-align: center;
+        }
+        .links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>👨‍💼 Staff Portal</h1>
+        <p class="subtitle">Manage waste collection requests</p>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-label">Total Requests</div>
+                <div class="stat-number" id="totalCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Received</div>
+                <div class="stat-number" id="receivedCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">In Progress</div>
+                <div class="stat-number" id="progressCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Completed</div>
+                <div class="stat-number" id="completedCount">0</div>
+            </div>
+        </div>
+        
+        <div class="filters">
+            <select id="municipalityFilter" onchange="loadBookings()">
+                <option value="">All Municipalities</option>
+            </select>
+            <select id="statusFilter" onchange="loadBookings()">
+                <option value="">All Statuses</option>
+                <option value="RECEIVED">Received</option>
+                <option value="ASSIGNED">Assigned</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELED">Canceled</option>
+            </select>
+            <button class="action-btn btn-assign" onclick="loadBookings()" 
+                style="padding: 10px 20px;">
+                🔄 Refresh
+            </button>
+        </div>
+        
+        <table class="bookings-table" id="bookingsTable">
+            <thead>
+                <tr>
+                    <th>Token</th>
+                    <th>Municipality</th>
+                    <th>Date</th>
+                    <th>Time Slot</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="bookingsBody">
+                <tr>
+                    <td colspan="7" class="no-bookings">Loading bookings...</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="links">
+            <a href="index.html">← Back to Booking</a> | 
+            <a href="check-booking.html">Check Booking</a>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8080/api';
+        let allBookings = [];
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadMunicipalities();
+            await loadBookings();
+        });
+        
+        async function loadMunicipalities() {
+            try {
+                const response = await fetch(`${API_URL}/municipalities`);
+                const municipalities = await response.json();
+                
+                const select = document.getElementById('municipalityFilter');
+                municipalities.forEach(m => {
+                    const option = document.createElement('option');
+                    option.value = m;
+                    option.textContent = m;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load municipalities');
+            }
+        }
+        
+        async function loadBookings() {
+            const municipality = document.getElementById('municipalityFilter').value;
+            let url = `${API_URL}/bookings`;
+            
+            if (municipality) {
+                url += `?municipality=${municipality}`;
+            }
+            
+            try {
+                const response = await fetch(url);
+                allBookings = await response.json();
+                filterAndDisplayBookings();
+                updateStats();
+            } catch (error) {
+                document.getElementById('bookingsBody').innerHTML = `
+                    <tr><td colspan="7" class="no-bookings">
+                        Error loading bookings. Please try again.
+                    </td></tr>
+                `;
+            }
+        }
+        
+        function filterAndDisplayBookings() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            
+            let filtered = allBookings;
+            if (statusFilter) {
+                filtered = allBookings.filter(b => b.currentState === statusFilter);
+            }
+            
+            const tbody = document.getElementById('bookingsBody');
+            
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr><td colspan="7" class="no-bookings">
+                        No bookings found matching the filters.
+                    </td></tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = filtered.map(booking => `
+                <tr>
+                    <td><small>${booking.token.substring(0, 8)}...</small></td>
+                    <td>${booking.municipality}</td>
+                    <td>${booking.collectionDate}</td>
+                    <td>${booking.timeSlot}</td>
+                    <td><small>${booking.description.substring(0, 50)}...</small></td>
+                    <td><span class="status status-badge status-${booking.currentState}">
+                        ${booking.currentState}
+                    </span></td>
+                    <td>${getActionButtons(booking)}</td>
+                </tr>
+            `).join('');
+        }
+        
+        function getActionButtons(booking) {
+            const buttons = [];
+            
+            if (booking.currentState === 'RECEIVED') {
+                buttons.push(`
+                    <button class="action-btn btn-assign" 
+                        onclick="updateStatus('${booking.token}', 'ASSIGNED')">
+                        Assign
+                    </button>
+                `);
+            }
+            
+            if (booking.currentState === 'ASSIGNED') {
+                buttons.push(`
+                    <button class="action-btn btn-progress" 
+                        onclick="updateStatus('${booking.token}', 'IN_PROGRESS')">
+                        Start
+                    </button>
+                `);
+            }
+            
+            if (booking.currentState === 'IN_PROGRESS') {
+                buttons.push(`
+                    <button class="action-btn btn-complete" 
+                        onclick="updateStatus('${booking.token}', 'COMPLETED')">
+                        Complete
+                    </button>
+                `);
+            }
+            
+            return buttons.join('') || '-';
+        }
+        
+        async function updateStatus(token, newStatus) {
+            try {
+                const response = await fetch(`${API_URL}/bookings/${token}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+                
+                if (response.ok) {
+                    await loadBookings();
+                } else {
+                    const error = await response.json();
+                    alert('Error: ' + error.message);
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+            }
+        }
+        
+        function updateStats() {
+            document.getElementById('totalCount').textContent = allBookings.length;
+            document.getElementById('receivedCount').textContent = 
+                allBookings.filter(b => b.currentState === 'RECEIVED').length;
+            document.getElementById('progressCount').textContent = 
+                allBookings.filter(b => b.currentState === 'IN_PROGRESS').length;
+            document.getElementById('completedCount').textContent = 
+                allBookings.filter(b => b.currentState === 'COMPLETED').length;
+        }
+    </script>
+</body>
+</html>

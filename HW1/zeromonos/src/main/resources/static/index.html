@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZeroMonos - Waste Collection Booking</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .success-message {
+            display: none;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .error-message {
+            display: none;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .token-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            word-break: break-all;
+        }
+        .token-label {
+            font-weight: bold;
+            color: #667eea;
+        }
+        .links {
+            margin-top: 30px;
+            text-align: center;
+        }
+        .links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+        .links a:hover {
+            text-decoration: underline;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗑️ ZeroMonos</h1>
+        <p class="subtitle">Book your bulky waste collection</p>
+        
+        <form id="bookingForm">
+            <div class="form-group">
+                <label for="municipality">Municipality *</label>
+                <select id="municipality" required>
+                    <option value="">Select your municipality...</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="description">Item Description *</label>
+                <textarea id="description" required 
+                    placeholder="Describe the items you want to collect (e.g., old sofa, mattress, washing machine)..."
+                    minlength="10" maxlength="500"></textarea>
+                <small>Minimum 10 characters</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="collectionDate">Collection Date *</label>
+                <input type="date" id="collectionDate" required>
+                <small>Must be at least 2 days in advance, no weekends</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="timeSlot">Preferred Time Slot *</label>
+                <select id="timeSlot" required>
+                    <option value="">Select time slot...</option>
+                    <option value="MORNING">Morning (8:00-12:00)</option>
+                    <option value="AFTERNOON">Afternoon (12:00-17:00)</option>
+                    <option value="EVENING">Evening (17:00-20:00)</option>
+                </select>
+            </div>
+            
+            <button type="submit" id="submitBtn">Book Collection</button>
+        </form>
+        
+        <div class="loading" id="loading">
+            <p>Processing your request...</p>
+        </div>
+        
+        <div class="success-message" id="successMessage">
+            <h3>✅ Booking Successful!</h3>
+            <p>Your collection has been scheduled.</p>
+            <div class="token-box">
+                <span class="token-label">Your Access Token:</span><br>
+                <span id="tokenValue"></span>
+            </div>
+            <p style="margin-top: 15px;">
+                <small>Save this token to check or cancel your booking later.</small>
+            </p>
+        </div>
+        
+        <div class="error-message" id="errorMessage"></div>
+        
+        <div class="links">
+            <a href="check-booking.html">Check My Booking</a> | 
+            <a href="staff.html">Staff Portal</a>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8080/api';
+
+        
+        // Load municipalities on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadMunicipalities();
+            setMinDate();
+        });
+
+        async function loadMunicipalities() {
+            try {
+                const response = await fetch(`${API_URL}/municipalities`);
+                const municipalities = await response.json();
+                
+                const select = document.getElementById('municipality');
+                municipalities.forEach(m => {
+                    const option = document.createElement('option');
+                    option.value = m;
+                    option.textContent = m;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                showError('Failed to load municipalities. Please refresh the page.');
+            }
+        }
+        
+        function setMinDate() {
+            const today = new Date();
+            const minDate = new Date(today);
+            minDate.setDate(today.getDate() + 2);
+            
+            document.getElementById('collectionDate').min =
+                minDate.toISOString().split('T')[0];
+        }
+        
+        document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const successMsg = document.getElementById('successMessage');
+            const errorMsg = document.getElementById('errorMessage');
+
+            // Hide previous messages
+            successMsg.style.display = 'none';
+            errorMsg.style.display = 'none';
+
+            // Show loading
+            submitBtn.disabled = true;
+            loading.style.display = 'block';
+
+            const bookingData = {
+                municipality: document.getElementById('municipality').value,
+                description: document.getElementById('description').value,
+                collectionDate: document.getElementById('collectionDate').value,
+                timeSlot: document.getElementById('timeSlot').value
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/bookings`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(bookingData)
+                });
+
+                const data = await response.json();
+                console.log("Response status:", response.status);
+                console.log("Response data:", JSON.stringify(data, null, 2));
+                if (response.ok) {
+                    document.getElementById('tokenValue').textContent = data.token;
+                    successMsg.style.display = 'block';
+                    document.getElementById('bookingForm').reset();
+                } else {
+                    const errorMessage = data.message || data.error || data.detail ||
+                        (data.errors && data.errors[0]?.defaultMessage) ||
+                        'Failed to create booking';
+                    showError(errorMessage);
+                }
+            } catch (error) {
+                showError('Network error. Please try again.');
+            } finally {
+                submitBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        });
+
+        function showError(message) {
+            const errorMsg = document.getElementById('errorMessage');
+            errorMsg.textContent = message;
+            errorMsg.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

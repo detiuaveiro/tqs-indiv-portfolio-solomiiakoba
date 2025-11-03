@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Booking - ZeroMonos</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { color: #667eea; margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 30px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-bottom: 10px;
+        }
+        button:hover { background: #5568d3; }
+        button.cancel-btn {
+            background: #dc3545;
+        }
+        button.cancel-btn:hover { background: #c82333; }
+        .booking-details {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .detail-label { font-weight: 600; color: #495057; }
+        .detail-value { color: #212529; }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .status-RECEIVED { background: #cfe2ff; color: #084298; }
+        .status-ASSIGNED { background: #fff3cd; color: #997404; }
+        .status-IN_PROGRESS { background: #d1e7dd; color: #0f5132; }
+        .status-COMPLETED { background: #d1e7dd; color: #0a3622; }
+        .status-CANCELED { background: #f8d7da; color: #842029; }
+        .history-section {
+            margin-top: 20px;
+        }
+        .history-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+        .error-message {
+            display: none;
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .links {
+            margin-top: 30px;
+            text-align: center;
+        }
+        .links a {
+            color: #667eea;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Check Your Booking</h1>
+        <p class="subtitle">Enter your access token to view booking details</p>
+        
+        <div class="form-group">
+            <label for="token">Access Token</label>
+            <input type="text" id="token" placeholder="Enter your booking token...">
+        </div>
+        
+        <button onclick="checkBooking()">Check Booking</button>
+        
+        <div class="error-message" id="errorMessage"></div>
+        
+        <div class="booking-details" id="bookingDetails">
+            <h3>Booking Information</h3>
+            <div class="detail-row">
+                <span class="detail-label">Status:</span>
+                <span class="detail-value" id="currentState"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Municipality:</span>
+                <span class="detail-value" id="municipality"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Collection Date:</span>
+                <span class="detail-value" id="collectionDate"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Time Slot:</span>
+                <span class="detail-value" id="timeSlot"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Description:</span>
+                <span class="detail-value" id="description"></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Created:</span>
+                <span class="detail-value" id="createdAt"></span>
+            </div>
+            
+            <div class="history-section">
+                <h4>Status History</h4>
+                <div id="statusHistory"></div>
+            </div>
+            
+            <button class="cancel-btn" id="cancelBtn" onclick="cancelBooking()">
+                Cancel Booking
+            </button>
+        </div>
+        
+        <div class="links">
+            <a href="index.html">← Back to Booking</a> | 
+            <a href="staff.html">Staff Portal</a>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8080/api';
+        let currentToken = '';
+        
+        async function checkBooking() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                showError('Please enter a token');
+                return;
+            }
+            
+            currentToken = token;
+            document.getElementById('errorMessage').style.display = 'none';
+            
+            try {
+                const response = await fetch(`${API_URL}/bookings/${token}`);
+                
+                if (response.ok) {
+                    const booking = await response.json();
+                    displayBooking(booking);
+                } else {
+                    const error = await response.json();
+                    showError(error.message || 'Booking not found');
+                    document.getElementById('bookingDetails').style.display = 'none';
+                }
+            } catch (error) {
+                showError('Network error. Please try again.');
+            }
+        }
+        
+        function displayBooking(booking) {
+            document.getElementById('currentState').innerHTML =
+                `<span class="status-badge status-${booking.currentState}">${booking.currentState}</span>`;
+            document.getElementById('municipality').textContent = booking.municipality;
+            document.getElementById('collectionDate').textContent = booking.collectionDate;
+            document.getElementById('timeSlot').textContent = booking.timeSlot;
+            document.getElementById('description').textContent = booking.description;
+            document.getElementById('createdAt').textContent = 
+                new Date(booking.createdAt).toLocaleString();
+            
+            // Display status history
+            const historyHtml = booking.statusHistory
+                .map(h => `
+                    <div class="history-item">
+                        <strong>${h.status}</strong> - ${new Date(h.timestamp).toLocaleString()}<br>
+                        <small>${h.statusDescription}</small>
+                    </div>
+                `).join('');
+            document.getElementById('statusHistory').innerHTML = historyHtml;
+            
+            // Show/hide cancel button
+            const cancelBtn = document.getElementById('cancelBtn');
+            if (booking.currentState === 'RECEIVED' || booking.currentState === 'ASSIGNED') {
+                cancelBtn.style.display = 'block';
+            } else {
+                cancelBtn.style.display = 'none';
+            }
+            
+            document.getElementById('bookingDetails').style.display = 'block';
+        }
+        
+        async function cancelBooking() {
+            if (!confirm('Are you sure you want to cancel this booking?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/bookings/${currentToken}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    alert('Booking cancelled successfully');
+                    checkBooking(); // Refresh
+                } else {
+                    const error = await response.json();
+                    showError(error.message || 'Failed to cancel booking');
+                }
+            } catch (error) {
+                showError('Network error. Please try again.');
+            }
+        }
+        
+        function showError(message) {
+            const errorMsg = document.getElementById('errorMessage');
+            errorMsg.textContent = message;
+            errorMsg.style.display = 'block';
+        }
+        
+        // Allow Enter key to check booking currentState
+        document.getElementById('token').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') checkBooking();
+        });
+    </script>
+</body>
+</html>
